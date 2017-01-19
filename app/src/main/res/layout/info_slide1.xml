@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
     Copyright (c) 2017 Nrupesh Patel
 
@@ -20,15 +21,21 @@
     TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -->
-<resources>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-    <!-- Declare custom theme attributes that allow changing which styles are
-         used for button bars depending on the API level.
-         ?android:attr/buttonBarStyle is new as of API 11 so this is
-         necessary to support previous API levels. -->
-    <declare-styleable name="ButtonBarContainerTheme">
-        <attr name="metaButtonBarStyle" format="reference" />
-        <attr name="metaButtonBarButtonStyle" format="reference" />
-    </declare-styleable>
+    <ImageView
+        android:layout_centerInParent="true"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@mipmap/ic_launcher"/>
 
-</resources>
+    <TextView
+        android:layout_alignParentBottom="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="This is info slide one This is info slide one This is info slide one."
+        android:textAlignment="center" />
+
+</RelativeLayout>
