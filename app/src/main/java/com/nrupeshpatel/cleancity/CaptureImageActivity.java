@@ -24,6 +24,7 @@
 
 package com.nrupeshpatel.cleancity;
 
+import android.*;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
@@ -32,10 +33,12 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
+import android.text.format.Time;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -51,6 +54,7 @@ import com.bumptech.glide.load.resource.drawable.GlideDrawable;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
 import com.nrupeshpatel.cleancity.helper.ConnectionDetector;
+import com.nrupeshpatel.cleancity.helper.PermissionUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,6 +64,7 @@ public class CaptureImageActivity extends AppCompatActivity {
     private boolean isGlide = true;
     private boolean isImageReady = false;
     private ImageView capturedImage;
+    private String realPath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,7 +74,7 @@ public class CaptureImageActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_capture_image);
 
-        String realPath = getIntent().getStringExtra("realPath");
+        realPath = getIntent().getStringExtra("realPath");
 
         final ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
         final FloatingActionButton done = (FloatingActionButton) findViewById(R.id.done);

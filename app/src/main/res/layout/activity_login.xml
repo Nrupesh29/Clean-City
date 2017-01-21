@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
     Copyright (c) 2017 Nrupesh Patel
 
     Permission is hereby granted, free of charge, to any person
@@ -54,17 +53,17 @@
             android:layout_height="wrap_content"
             android:layout_alignParentLeft="true"
             android:layout_alignParentTop="true"
-            android:visibility="gone"
             android:text="BACK"
             android:textColor="#666666"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:visibility="gone" />
 
     </RelativeLayout>
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/signInButton"
+        android:layout_above="@+id/signInBtnContainer"
         android:layout_below="@+id/buttonLayout">
 
         <android.support.v4.view.ViewPager
@@ -85,7 +84,7 @@
     </RelativeLayout>
 
     <RelativeLayout
-        android:id="@+id/signInButton"
+        android:id="@+id/signInBtnContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_above="@+id/footerText"
@@ -93,7 +92,7 @@
         android:background="@drawable/button_border">
 
         <Button
-            android:id="@+id/button"
+            android:id="@+id/signInButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@android:color/transparent"

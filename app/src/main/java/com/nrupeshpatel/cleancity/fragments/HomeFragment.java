@@ -148,6 +148,12 @@ public class HomeFragment extends Fragment {
             }
         }));
 
+        if (pendingList.isEmpty()) {
+            recyclerView.setVisibility(View.GONE);
+        } else {
+            recyclerView.setVisibility(View.VISIBLE);
+        }
+
         return v;
     }
 

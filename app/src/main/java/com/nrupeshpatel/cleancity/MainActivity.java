@@ -25,10 +25,14 @@
 package com.nrupeshpatel.cleancity;
 
 import android.Manifest;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.StrictMode;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -39,7 +43,9 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
+import android.support.v7.app.AlertDialog;
 import android.text.format.Time;
+import android.util.Base64;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -51,22 +57,39 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.auth.api.Auth;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.firebase.auth.FirebaseAuth;
 import com.nrupeshpatel.cleancity.fragments.HomeFragment;
+import com.nrupeshpatel.cleancity.helper.ConnectionDetector;
 import com.nrupeshpatel.cleancity.helper.PermissionUtils;
 import com.nrupeshpatel.cleancity.helper.PrefManager;
+import com.nrupeshpatel.cleancity.helper.SessionManager;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
+import de.hdodenhof.circleimageview.CircleImageView;
 import uk.co.samuelwall.materialtaptargetprompt.MaterialTapTargetPrompt;
 
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, HomeFragment.OnFragmentInteractionListener {
+        implements HomeFragment.OnFragmentInteractionListener {
 
+    private TextView toolbarTitle;
     private PrefManager prefManager;
+    private GoogleApiClient mGoogleApiClientAuth;
+    private SessionManager session;
     private String realPath = null;
     public static final int CAMERA_PERMISSIONS_REQUEST = 1;
     public static final int CAMERA_IMAGE_REQUEST = 2;
@@ -80,13 +103,49 @@ public class MainActivity extends AppCompatActivity
     };
 
     @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+
+        savedInstanceState.putString("realPath", realPath);
+
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+
+        realPath = savedInstanceState.getString("realPath");
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle("");
 
-        getSupportActionBar().setTitle("Home");
+        session = new SessionManager(getApplicationContext());
+
+        CircleImageView toolbarLogo = (CircleImageView) findViewById(R.id.toolbarLogo);
+        toolbarTitle = (TextView) findViewById(R.id.toolbarTitle);
+
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.default_web_client_id))
+                .requestEmail()
+                .build();
+
+        mGoogleApiClientAuth = new GoogleApiClient.Builder(this)
+                .enableAutoManage(this /* FragmentActivity */, new GoogleApiClient.OnConnectionFailedListener() {
+                    @Override
+                    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+                    }
+                } /* OnConnectionFailedListener */)
+                .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
+                .build();
+
+        toolbarTitle.setText("Home");
 
         prefManager = new PrefManager(this);
 
@@ -102,21 +161,17 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.setDrawerListener(toggle);
-        toggle.syncState();
-
-        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
-
         ViewPager viewPager = (ViewPager) findViewById(R.id.viewpager);
         setupViewPager(viewPager);
 
         tabLayout = (TabLayout) findViewById(R.id.tabs);
         tabLayout.setupWithViewPager(viewPager);
         setupTabIcons();
+
+        HashMap<String, String> user = session.getUserDetails();
+
+        Bitmap bitmap = getImage(user.get(SessionManager.KEY_PROFILE));
+        toolbarLogo.setImageBitmap(bitmap);
     }
 
     private void setupTabIcons() {
@@ -141,7 +196,7 @@ public class MainActivity extends AppCompatActivity
 
             @Override
             public void onPageSelected(int position) {
-                getSupportActionBar().setTitle(mFragmentTitleList.get(position));
+                toolbarTitle.setText(mFragmentTitleList.get(position));
             }
 
             @Override
@@ -219,7 +274,7 @@ public class MainActivity extends AppCompatActivity
         if (externalStorageStagte.equals(Environment.MEDIA_MOUNTED)) {
             File photoDir = Environment
                     .getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-            outputDir = new File(photoDir, "MedicineWatch");
+            outputDir = new File(photoDir, "CleanCity");
             if (!outputDir.exists())
                 if (!outputDir.mkdirs()) {
                     Toast.makeText(
@@ -276,10 +331,10 @@ public class MainActivity extends AppCompatActivity
                                     .setBackgroundColour(getResources().getColor(R.color.colorPrimary))
                                     .setAnimationInterpolator(new FastOutSlowInInterpolator())
                                     .setMaxTextWidth(R.dimen.tap_target_menu_max_width)
-                                    .setIcon(R.drawable.ic_menu_actionbar)
+                                    .setIcon(android.R.color.transparent)
                                     .setIconDrawableColourFilter(getResources().getColor(R.color.colorPrimary));
-                            final Toolbar tb = (Toolbar) MainActivity.this.findViewById(R.id.toolbar);
-                            tapTargetPromptBuilder.setTarget(tb.getChildAt(1));
+                            final CircleImageView tb = (CircleImageView) MainActivity.this.findViewById(R.id.toolbarLogo);
+                            tapTargetPromptBuilder.setTarget(tb);
 
                             tapTargetPromptBuilder.setOnHidePromptListener(new MaterialTapTargetPrompt.OnHidePromptListener() {
                                 @Override
@@ -294,7 +349,7 @@ public class MainActivity extends AppCompatActivity
                                                 .setMaxTextWidth(R.dimen.tap_target_menu_max_width)
                                                 .setIcon(R.drawable.ic_logout_actionbar)
                                                 .setIconDrawableColourFilter(getResources().getColor(R.color.colorPrimary))
-                                                .setTarget(R.id.action_settings)
+                                                .setTarget(R.id.action_logout)
                                                 .setOnHidePromptListener(new MaterialTapTargetPrompt.OnHidePromptListener() {
                                                     @Override
                                                     public void onHidePrompt(MotionEvent event, boolean tappedTarget) {
@@ -328,16 +383,6 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        if (drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
-        }
-    }
-
-    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
@@ -352,35 +397,34 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        if (id == R.id.action_logout) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Logout?")
+                    .setMessage("Are you sure you want to logout?")
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            FirebaseAuth.getInstance().signOut();
+                            Auth.GoogleSignInApi.signOut(mGoogleApiClientAuth);
+                            session.logoutUser();
+                            startActivity(new Intent(MainActivity.this, LoginActivity.class));
+                            finish();
+                        }
+                    })
+                    .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            // do nothing
+                        }
+                    })
+                    .setCancelable(false)
+                    .show();
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    @SuppressWarnings("StatementWithEmptyBody")
-    @Override
-    public boolean onNavigationItemSelected(MenuItem item) {
-        // Handle navigation view item clicks here.
-        int id = item.getItemId();
-
-        if (id == R.id.nav_camera) {
-            // Handle the camera action
-        } else if (id == R.id.nav_gallery) {
-
-        } else if (id == R.id.nav_slideshow) {
-
-        } else if (id == R.id.nav_manage) {
-
-        } else if (id == R.id.nav_share) {
-
-        } else if (id == R.id.nav_send) {
-
-        }
-
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        drawer.closeDrawer(GravityCompat.START);
-        return true;
+    // convert from byte array to bitmap
+    public static Bitmap getImage(String image) {
+        byte[] imageArray = Base64.decode(image, Base64.DEFAULT);
+        return BitmapFactory.decodeByteArray(imageArray, 0, imageArray.length);
     }
 }
