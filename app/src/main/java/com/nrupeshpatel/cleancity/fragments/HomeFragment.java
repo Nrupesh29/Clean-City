@@ -24,14 +24,18 @@
 
 package com.nrupeshpatel.cleancity.fragments;
 
+import android.app.ProgressDialog;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -41,12 +45,21 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.nrupeshpatel.cleancity.CaptureImageActivity;
 import com.nrupeshpatel.cleancity.R;
 import com.nrupeshpatel.cleancity.adapter.Complaint;
 import com.nrupeshpatel.cleancity.adapter.ComplaintAdapter;
+import com.nrupeshpatel.cleancity.helper.Config;
 import com.nrupeshpatel.cleancity.helper.EndlessRecyclerViewScrollListener;
+import com.nrupeshpatel.cleancity.helper.RequestHandler;
+import com.nrupeshpatel.cleancity.helper.SessionManager;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
@@ -61,9 +74,10 @@ import java.util.List;
 public class HomeFragment extends Fragment {
 
     private EndlessRecyclerViewScrollListener scrollListener;
-    public List<Complaint> pendingList = new ArrayList<>();
+    public List<Complaint> complaintList = new ArrayList<>();
     ComplaintAdapter mAdapter;
     RecyclerView recyclerView;
+    private SessionManager session;
 
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -113,13 +127,11 @@ public class HomeFragment extends Fragment {
         // Inflate the layout for this fragment
         View v = inflater.inflate(R.layout.fragment_home, container, false);
 
+        session = new SessionManager(getActivity().getApplicationContext());
+
         recyclerView = (RecyclerView) v.findViewById(R.id.recycler_view);
 
-        /*for (int i = 0; i < 10 ; i++) {
-            pendingList.add(new Complaint(i, false));
-        }*/
-
-        mAdapter = new ComplaintAdapter(getActivity(), pendingList);
+        mAdapter = new ComplaintAdapter(getActivity(), complaintList);
         LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity().getApplicationContext());
         recyclerView.setLayoutManager(mLayoutManager);
         recyclerView.setItemAnimator(new DefaultItemAnimator());
@@ -148,11 +160,13 @@ public class HomeFragment extends Fragment {
             }
         }));
 
-        if (pendingList.isEmpty()) {
+        if (complaintList.isEmpty()) {
             recyclerView.setVisibility(View.GONE);
         } else {
             recyclerView.setVisibility(View.VISIBLE);
         }
+
+        new GetComplaints().execute();
 
         return v;
     }
@@ -270,5 +284,60 @@ public class HomeFragment extends Fragment {
         void onClick(View view, int position);
 
         void onLongClick(View view, int position);
+    }
+
+    private class GetComplaints extends AsyncTask<Bitmap, Void, String> {
+
+        String JSON_STRING;
+        JSONObject jsonObject = null;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            //loading = ProgressDialog.show(getActivity(), null, "Getting location...", true, true);
+            //loading.setCancelable(false);
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            mAdapter.notifyDataSetChanged();
+            recyclerView.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        protected String doInBackground(Bitmap... params) {
+
+            HashMap<String, String> user = session.getUserDetails();
+            RequestHandler rh = new RequestHandler();
+            JSON_STRING = rh.sendGetRequest(Config.getComplaints + user.get(SessionManager.KEY_EMAIL));
+            JSON_STRING = "{\"result\":" + JSON_STRING + "}";
+            try {
+                jsonObject = new JSONObject(JSON_STRING);
+                JSONArray result = jsonObject.getJSONArray("result");
+
+                for (int i = 0; i < result.length(); i++) {
+                    JSONObject jo = result.getJSONObject(i);
+                    String id = jo.getString("_id");
+                    boolean starred = jo.getBoolean("starred");
+                    String status = jo.getString("status");
+                    String detail = jo.getString("detail");
+                    String date = jo.getString("date");
+                    String image = jo.getString("imagePath") + id + ".png";
+                    String address = jo.getString("address");
+
+                    Log.i(".`.`.", image);
+
+                    Complaint c = new Complaint(id, status, detail, date, address, starred, image);
+                    complaintList.add(c);
+                }
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            return null;
+
+        }
     }
 }

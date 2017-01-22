@@ -26,29 +26,49 @@ package com.nrupeshpatel.cleancity.adapter;
 
 public class Complaint {
 
-    private boolean star;
-    private int id;
+    private String id, status, detail, date, address, image;
+    private boolean starred;
 
     public Complaint() {
 
     }
 
-    public Complaint(int id, boolean star) {
+    public Complaint(String id, String status, String detail, String date, String address, boolean starred, String image) {
         this.id = id;
-        this.star = star;
+        this.status = status;
+        this.detail = detail;
+        this.date = date;
+        this.address = address;
+        this.starred = starred;
+        this.image = image;
     }
 
-
-    void setStar(boolean star) {
-        this.star = star;
-    }
-
-    boolean getStar() {
-        return this.star;
-    }
-
-    public int getId() {
+    public String getId() {
         return this.id;
+    }
+
+    String getStatus() {
+        return this.status;
+    }
+
+    String getDetail() {
+        return this.detail;
+    }
+
+    String getDate() {
+        return this.date;
+    }
+
+    String getAddress() {
+        return this.address;
+    }
+
+    boolean getStarred() {
+        return this.starred;
+    }
+
+    String getImage() {
+        return this.image;
     }
 
 }

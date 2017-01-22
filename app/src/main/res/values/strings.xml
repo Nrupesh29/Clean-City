@@ -36,4 +36,10 @@
     <string name="title_activity_camera">CameraActivity</string>
     <string name="dummy_button">Dummy Button</string>
     <string name="dummy_content">DUMMY\nCONTENT</string>
+
+    <string name="location_not_access">Location cannot be accessed!!</string>
+    <string name="not_supported">This device is not supported.</string>
+    <string name="dir_error">Failed to create directory!!</string>
+    <string name="location_alert">Your location setting is not enabled. Please enable location to use this app.</string>
+
 </resources>

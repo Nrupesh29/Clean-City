@@ -55,7 +55,7 @@
                     android:layout_centerInParent="true" />
 
                 <ImageView
-                    android:id="@+id/scanImage"
+                    android:id="@+id/complaintImage"
                     android:layout_width="110dp"
                     android:layout_height="110dp"
                     android:padding="10dp"
@@ -81,7 +81,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textSize="17sp"
+                        android:textSize="15sp"
                         android:paddingBottom="5dp"
                         android:text="431256"
                         android:textStyle="bold" />
@@ -97,7 +97,7 @@
                 </RelativeLayout>
 
                 <TextView
-                    android:id="@+id/scanNumber"
+                    android:id="@+id/complaintStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center"
@@ -115,7 +115,7 @@
                     android:layout_height="match_parent">
 
                     <TextView
-                        android:id="@+id/time"
+                        android:id="@+id/complaintTime"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textSize="10sp"
@@ -125,7 +125,7 @@
                         android:text="16 Jan 2016"/>
 
                     <TextView
-                        android:id="@+id/location"
+                        android:id="@+id/complaintLocation"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textSize="10sp"

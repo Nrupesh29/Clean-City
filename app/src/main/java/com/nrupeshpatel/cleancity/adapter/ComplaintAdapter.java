@@ -25,6 +25,7 @@
 package com.nrupeshpatel.cleancity.adapter;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,6 +34,10 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.drawable.GlideDrawable;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.nrupeshpatel.cleancity.R;
 
 import java.util.List;
@@ -45,17 +50,21 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.MyVi
     class MyViewHolder extends RecyclerView.ViewHolder {
         TextView complaintId, ndc, status;
         public ImageView star;
+        private ImageView complaintImage;
+        private TextView complaintStatus;
+        private TextView complaintTime;
+        private TextView complaintLocation;
         ProgressBar pBar;
 
         MyViewHolder(View view) {
             super(view);
             star = (ImageView) view.findViewById(R.id.star);
             complaintId = (TextView) view.findViewById(R.id.complaintID);
-            /*ndc = (TextView) view.findViewById(R.id.scanNdc);
-            number = (TextView) view.findViewById(R.id.scanNumber);
-            status = (TextView) view.findViewById(R.id.scanStatus);
-            image = (ImageView) view.findViewById(R.id.scanImage);
-            pBar = (ProgressBar) view.findViewById(R.id.progressBar);*/
+            complaintStatus = (TextView) view.findViewById(R.id.complaintStatus);
+            complaintTime = (TextView) view.findViewById(R.id.complaintTime);
+            complaintLocation = (TextView) view.findViewById(R.id.complaintLocation);
+            complaintImage = (ImageView) view.findViewById(R.id.complaintImage);
+            pBar = (ProgressBar) view.findViewById(R.id.progressBar);
         }
     }
 
@@ -91,8 +100,8 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.MyVi
 
         if (getItemViewType(position) == 1) {
             final Complaint complaint = complaintList.get(position);
-            holder.complaintId.setText(String.valueOf(position));
-            final boolean isStared = complaint.getStar();
+
+            final boolean isStared = complaint.getStarred();
             if (!isStared) {
                 holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_row));
             } else {
@@ -102,34 +111,26 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.MyVi
                 @Override
                 public void onClick(View view) {
                     if (!isStared) {
-                        complaint.setStar(true);
+                        //complaint.setStar(true);
                         holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_selected_row));
                     } else {
-                        complaint.setStar(false);
+                        //complaint.setStar(false);
                         holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_row));
                     }
                 }
             });
+
+            holder.complaintId.setText(complaint.getId());
+            holder.complaintStatus.setText(complaint.getStatus());
+            holder.complaintTime.setText(complaint.getDate());
+            holder.complaintLocation.setText(complaint.getAddress());
+
+            Glide.with(context)
+                    .load(complaint.getImage())
+                    .centerCrop()
+                    .into(holder.complaintImage);
+            holder.pBar.setVisibility(View.GONE);
         }
-        /*holder.ndc.setText("NDC: " + history.getNdc());
-        holder.number.setText("Recall Number: " + history.getNumber());
-        holder.status.setText("Recall Status: " + history.getStatus());
-
-        Glide.with(context)
-                .load(getResId(history.getImage(), R.drawable.class))
-                .listener(new RequestListener<Integer, GlideDrawable>() {
-                    @Override
-                    public boolean onException(Exception e, Integer model, Target<GlideDrawable> target, boolean isFirstResource) {
-                        return false;
-                    }
-
-                    @Override
-                    public boolean onResourceReady(GlideDrawable resource, Integer model, Target<GlideDrawable> target, boolean isFromMemoryCache, boolean isFirstResource) {
-                        holder.pBar.setVisibility(View.GONE);
-                        return false;
-                    }
-                })
-                .into(holder.image);*/
     }
 
     @Override

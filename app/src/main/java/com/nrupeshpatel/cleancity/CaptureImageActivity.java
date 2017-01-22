@@ -25,12 +25,14 @@
 package com.nrupeshpatel.cleancity;
 
 import android.*;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -39,11 +41,13 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.text.format.Time;
+import android.util.Base64;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -53,18 +57,36 @@ import com.bumptech.glide.load.resource.bitmap.GlideBitmapDrawable;
 import com.bumptech.glide.load.resource.drawable.GlideDrawable;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
+import com.nrupeshpatel.cleancity.helper.Config;
 import com.nrupeshpatel.cleancity.helper.ConnectionDetector;
 import com.nrupeshpatel.cleancity.helper.PermissionUtils;
+import com.nrupeshpatel.cleancity.helper.RequestHandler;
+import com.nrupeshpatel.cleancity.helper.SessionManager;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 
 public class CaptureImageActivity extends AppCompatActivity {
 
     private boolean isGlide = true;
     private boolean isImageReady = false;
     private ImageView capturedImage;
-    private String realPath;
+    private String latitude;
+    private String longitude;
+    private String address;
+    private String detail;
+    private ProgressDialog loading;
+    private SessionManager session;
+    private String image = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,10 +96,15 @@ public class CaptureImageActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_capture_image);
 
-        realPath = getIntent().getStringExtra("realPath");
+        String realPath = getIntent().getStringExtra("realPath");
+        latitude = getIntent().getStringExtra("latitude");
+        longitude = getIntent().getStringExtra("longitude");
+
+        session = new SessionManager(getApplicationContext());
 
         final ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
         final FloatingActionButton done = (FloatingActionButton) findViewById(R.id.done);
+        final EditText detailEt = (EditText) findViewById(R.id.detail);
 
         final Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -130,10 +157,11 @@ public class CaptureImageActivity extends AppCompatActivity {
                         ConnectionDetector cd = new ConnectionDetector(CaptureImageActivity.this);
                         Boolean isInternetPresent = cd.isConnectingToInternet();
                         if (isInternetPresent) {
+                            detail = detailEt.getText().toString();
 
-                            //callCloudVision(scaleBitmapDown(
-                                    //((GlideBitmapDrawable) capturedImage.getDrawable()).getBitmap(), 1500));
-
+                            image = getStringImage(scaleBitmapDown(
+                                    ((GlideBitmapDrawable) capturedImage.getDrawable()).getBitmap(), 1500));
+                            new GetLocation().execute();
                         } else {
                             Toast.makeText(CaptureImageActivity.this, "No Internet Connectivity!!", Toast.LENGTH_SHORT).show();
                         }
@@ -209,5 +237,85 @@ public class CaptureImageActivity extends AppCompatActivity {
             resizedWidth = maxDimension;
         }
         return Bitmap.createScaledBitmap(bitmap, resizedWidth, resizedHeight, false);
+    }
+
+    private class AddComplaint extends AsyncTask<String, Void, String> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            loading.setTitle("Posting complaint...");
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            loading.dismiss();
+            finish();
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+
+            RequestHandler rh = new RequestHandler();
+            HashMap<String, String> data = new HashMap<>();
+            HashMap<String, String> user = session.getUserDetails();
+
+            Calendar c = Calendar.getInstance();
+            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            final String formattedDate = df.format(c.getTime());
+
+            data.put("email", user.get(SessionManager.KEY_EMAIL));
+            data.put("address", address);
+            data.put("detail", detail);
+            data.put("date", formattedDate);
+            data.put("image", image);
+            return rh.sendPostRequest(Config.addComplaint, data);
+        }
+    }
+
+    private class GetLocation extends AsyncTask<Bitmap, Void, String> {
+
+        String JSON_STRING;
+        JSONObject jsonObject = null;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            loading = ProgressDialog.show(CaptureImageActivity.this, null, "Getting location...", true, true);
+            loading.setCancelable(false);
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            new AddComplaint().execute();
+        }
+
+        @Override
+        protected String doInBackground(Bitmap... params) {
+
+            RequestHandler rh = new RequestHandler();
+            JSON_STRING = rh.sendGetRequest("http://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude);
+            try {
+                jsonObject = new JSONObject(JSON_STRING);
+                JSONArray result = jsonObject.getJSONArray("results");
+                JSONObject jo = result.getJSONObject(0);
+                address = jo.getString("formatted_address");
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            return null;
+
+        }
+    }
+
+    public String getStringImage(Bitmap bmp) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.JPEG, 20, baos);
+        byte[] imageBytes = baos.toByteArray();
+        return Base64.encodeToString(imageBytes, Base64.DEFAULT);
     }
 }

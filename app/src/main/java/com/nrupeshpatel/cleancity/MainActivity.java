@@ -25,22 +25,30 @@
 package com.nrupeshpatel.cleancity;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.StrictMode;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.CursorLoader;
 import android.support.v4.view.ViewPager;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
 import android.support.v7.app.AlertDialog;
@@ -63,7 +71,10 @@ import android.widget.Toast;
 import com.google.android.gms.auth.api.Auth;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.firebase.auth.FirebaseAuth;
 import com.nrupeshpatel.cleancity.fragments.HomeFragment;
 import com.nrupeshpatel.cleancity.helper.ConnectionDetector;
@@ -84,9 +95,16 @@ import de.hdodenhof.circleimageview.CircleImageView;
 import uk.co.samuelwall.materialtaptargetprompt.MaterialTapTargetPrompt;
 
 public class MainActivity extends AppCompatActivity
-        implements HomeFragment.OnFragmentInteractionListener {
+        implements HomeFragment.OnFragmentInteractionListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+
+    private GoogleApiClient mGoogleApiClient;
+    private static final String TAG = MainActivity.class.getSimpleName();
+    private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 1000;
+    private LocationRequest mLocationRequest;
+    String longitude, latitude;
 
     private TextView toolbarTitle;
+    private LocationManager locationManager;
     private PrefManager prefManager;
     private GoogleApiClient mGoogleApiClientAuth;
     private SessionManager session;
@@ -95,7 +113,13 @@ public class MainActivity extends AppCompatActivity
     public static final int CAMERA_IMAGE_REQUEST = 2;
     private TabLayout tabLayout;
     private final List<String> mFragmentTitleList = new ArrayList<>();
-    private int[] tabIcons = {
+    private int[] tabIconsInactive = {
+            R.drawable.ic_home_tab_inactive,
+            R.drawable.ic_pending_tab_inactive,
+            R.drawable.ic_solved_tab_inactive,
+            R.drawable.ic_star_tab_inactive
+    };
+    private int[] tabIconsActive = {
             R.drawable.ic_home_tab,
             R.drawable.ic_pending_tab,
             R.drawable.ic_solved_tab,
@@ -130,6 +154,12 @@ public class MainActivity extends AppCompatActivity
         CircleImageView toolbarLogo = (CircleImageView) findViewById(R.id.toolbarLogo);
         toolbarTitle = (TextView) findViewById(R.id.toolbarTitle);
 
+        if (checkPlayServices()) {
+            buildGoogleApiClient();
+        }
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
@@ -157,6 +187,7 @@ public class MainActivity extends AppCompatActivity
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
                 startCamera();
             }
         });
@@ -168,17 +199,44 @@ public class MainActivity extends AppCompatActivity
         tabLayout.setupWithViewPager(viewPager);
         setupTabIcons();
 
+        viewPager.setOffscreenPageLimit(4);
+
         HashMap<String, String> user = session.getUserDetails();
 
         Bitmap bitmap = getImage(user.get(SessionManager.KEY_PROFILE));
         toolbarLogo.setImageBitmap(bitmap);
     }
 
+    private void showAlert() {
+        final AlertDialog.Builder dialog = new AlertDialog.Builder(MainActivity.this);
+        dialog.setTitle("Enable Location")
+                .setCancelable(false)
+                .setMessage(getString(R.string.location_alert))
+                .setPositiveButton("Location Settings", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                        Intent myIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                        startActivity(myIntent);
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                    }
+                });
+        dialog.show();
+    }
+
+    private boolean isLocationEnabled() {
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    }
+
     private void setupTabIcons() {
-        tabLayout.getTabAt(0).setIcon(tabIcons[0]);
-        tabLayout.getTabAt(1).setIcon(tabIcons[1]);
-        tabLayout.getTabAt(2).setIcon(tabIcons[2]);
-        tabLayout.getTabAt(3).setIcon(tabIcons[3]);
+        tabLayout.getTabAt(0).setIcon(tabIconsActive[0]);
+        tabLayout.getTabAt(1).setIcon(tabIconsInactive[1]);
+        tabLayout.getTabAt(2).setIcon(tabIconsInactive[2]);
+        tabLayout.getTabAt(3).setIcon(tabIconsInactive[3]);
     }
 
     private void setupViewPager(ViewPager viewPager) {
@@ -197,6 +255,11 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onPageSelected(int position) {
                 toolbarTitle.setText(mFragmentTitleList.get(position));
+                tabLayout.getTabAt(position).setIcon(tabIconsActive[position]);
+                for (int i = 0; i < 4; i++) {
+                    if (i != position)
+                        tabLayout.getTabAt(i).setIcon(tabIconsInactive[i]);
+                }
             }
 
             @Override
@@ -245,11 +308,17 @@ public class MainActivity extends AppCompatActivity
                 this,
                 CAMERA_PERMISSIONS_REQUEST,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.CAMERA)) {
-            Uri mHighQualityImageUri = generateTimeStampPhotoFileUri();
-            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, mHighQualityImageUri);
-            startActivityForResult(intent, CAMERA_IMAGE_REQUEST);
+            if (isLocationEnabled()) {
+                findLocation();
+                Uri mHighQualityImageUri = generateTimeStampPhotoFileUri();
+                Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, mHighQualityImageUri);
+                startActivityForResult(intent, CAMERA_IMAGE_REQUEST);
+            } else {
+                showAlert();
+            }
         }
     }
 
@@ -293,9 +362,11 @@ public class MainActivity extends AppCompatActivity
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == CAMERA_IMAGE_REQUEST && resultCode == RESULT_OK) {
-            //uploadImage(Uri.fromFile(getCameraFile()));
+
             Intent i = new Intent(this, CaptureImageActivity.class);
             i.putExtra("realPath", realPath);
+            i.putExtra("latitude", latitude);
+            i.putExtra("longitude", longitude);
             startActivity(i);
         }
     }
@@ -422,9 +493,90 @@ public class MainActivity extends AppCompatActivity
         return super.onOptionsItemSelected(item);
     }
 
-    // convert from byte array to bitmap
     public static Bitmap getImage(String image) {
         byte[] imageArray = Base64.decode(image, Base64.DEFAULT);
         return BitmapFactory.decodeByteArray(imageArray, 0, imageArray.length);
     }
+
+    protected synchronized void buildGoogleApiClient() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API).build();
+    }
+
+    private boolean checkPlayServices() {
+        int resultCode = GooglePlayServicesUtil
+                .isGooglePlayServicesAvailable(this);
+        if (resultCode != ConnectionResult.SUCCESS) {
+            if (GooglePlayServicesUtil.isUserRecoverableError(resultCode)) {
+                GooglePlayServicesUtil.getErrorDialog(resultCode, this,
+                        PLAY_SERVICES_RESOLUTION_REQUEST).show();
+            } else {
+                Toast.makeText(getApplicationContext(),
+                        getString(R.string.not_supported), Toast.LENGTH_LONG)
+                        .show();
+                finish();
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private void findLocation() {
+
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        Location mLastLocation = LocationServices.FusedLocationApi
+                .getLastLocation(mGoogleApiClient);
+
+        if (mLastLocation != null) {
+            double latitude = mLastLocation.getLatitude();
+            double longitude = mLastLocation.getLongitude();
+            this.latitude = String.valueOf(latitude);
+            this.longitude = String.valueOf(longitude);
+
+        } else {
+
+            Toast.makeText(getApplicationContext(), getString(R.string.location_not_access), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (mGoogleApiClient != null) {
+            mGoogleApiClient.connect();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkPlayServices();
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult result) {
+        Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = "
+                + result.getErrorCode());
+    }
+
+    @Override
+    public void onConnected(Bundle arg0) {
+
+        if (isLocationEnabled()) {
+            findLocation();
+        } else {
+            showAlert();
+        }
+    }
+
+    @Override
+    public void onConnectionSuspended(int arg0) {
+        mGoogleApiClient.connect();
+    }
+
 }
