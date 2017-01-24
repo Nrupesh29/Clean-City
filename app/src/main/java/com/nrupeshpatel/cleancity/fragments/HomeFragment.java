@@ -24,15 +24,13 @@
 
 package com.nrupeshpatel.cleancity.fragments;
 
-import android.app.ProgressDialog;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.Fragment;
-import android.support.v7.widget.DefaultItemAnimator;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -41,16 +39,13 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
-import com.nrupeshpatel.cleancity.CaptureImageActivity;
 import com.nrupeshpatel.cleancity.R;
 import com.nrupeshpatel.cleancity.adapter.Complaint;
 import com.nrupeshpatel.cleancity.adapter.ComplaintAdapter;
 import com.nrupeshpatel.cleancity.helper.Config;
-import com.nrupeshpatel.cleancity.helper.EndlessRecyclerViewScrollListener;
+import com.nrupeshpatel.cleancity.helper.OnLoadMoreListener;
 import com.nrupeshpatel.cleancity.helper.RequestHandler;
 import com.nrupeshpatel.cleancity.helper.SessionManager;
 
@@ -59,32 +54,24 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
-/**
- * A simple {@link Fragment} subclass.
- * Activities that contain this fragment must implement the
- * {@link HomeFragment.OnFragmentInteractionListener} interface
- * to handle interaction events.
- * Use the {@link HomeFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
 public class HomeFragment extends Fragment {
 
-    private EndlessRecyclerViewScrollListener scrollListener;
     public List<Complaint> complaintList = new ArrayList<>();
     ComplaintAdapter mAdapter;
     RecyclerView recyclerView;
+    private int totalCount = 0;
     private SessionManager session;
+    Handler handler;
+    int pageNumber = 0;
+    ProgressBar pBar;
+    SwipeRefreshLayout mySwipeRefreshLayout;
 
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
 
-    // TODO: Rename and change types of parameters
     private String mParam1;
     private String mParam2;
 
@@ -94,15 +81,6 @@ public class HomeFragment extends Fragment {
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment HomeFragment.
-     */
-    // TODO: Rename and change types and number of parameters
     public static HomeFragment newInstance(String param1, String param2) {
         HomeFragment fragment = new HomeFragment();
         Bundle args = new Bundle();
@@ -124,30 +102,41 @@ public class HomeFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
+
         View v = inflater.inflate(R.layout.fragment_home, container, false);
 
         session = new SessionManager(getActivity().getApplicationContext());
 
+        pBar = (ProgressBar) v.findViewById(R.id.progressBar);
+        mySwipeRefreshLayout = (SwipeRefreshLayout) v.findViewById(R.id.swiperefresh);
+
+        new GetComplaints().execute(0);
+
+        handler = new Handler();
+
         recyclerView = (RecyclerView) v.findViewById(R.id.recycler_view);
 
-        mAdapter = new ComplaintAdapter(getActivity(), complaintList);
         LinearLayoutManager mLayoutManager = new LinearLayoutManager(getActivity().getApplicationContext());
+
         recyclerView.setLayoutManager(mLayoutManager);
-        recyclerView.setItemAnimator(new DefaultItemAnimator());
+
+        mAdapter = new ComplaintAdapter(complaintList, recyclerView);
+
         recyclerView.setAdapter(mAdapter);
-        scrollListener = new EndlessRecyclerViewScrollListener(mLayoutManager) {
+
+        mAdapter.setOnLoadMoreListener(new OnLoadMoreListener() {
             @Override
-            public void onLoadMore(int page, int totalItemsCount, RecyclerView view) {
-                // Triggered only when new data needs to be appended to the list
-                // Add whatever code is needed to append new items to the bottom of the list
-                loadNextData(totalItemsCount);
-                //Toast.makeText(getActivity(), String.valueOf(totalItemsCount), Toast.LENGTH_SHORT).show();
+            public void onLoadMore() {
+
+                if (complaintList.size() < totalCount) {
+                    complaintList.add(null);
+                    mAdapter.notifyItemInserted(complaintList.size() - 1);
+
+                    new GetComplaints().execute(complaintList.size() - 1);
+                }
             }
-        };
-        // Adds the scroll listener to RecyclerView
-        recyclerView.addOnScrollListener(scrollListener);
-        //mAdapter.notifyItemRangeInserted(0, 10);
+        });
+
         recyclerView.addOnItemTouchListener(new RecyclerTouchListener(getActivity().getApplicationContext(), recyclerView, new ClickListener() {
             @Override
             public void onClick(View view, int position) {
@@ -160,41 +149,18 @@ public class HomeFragment extends Fragment {
             }
         }));
 
-        if (complaintList.isEmpty()) {
-            recyclerView.setVisibility(View.GONE);
-        } else {
-            recyclerView.setVisibility(View.VISIBLE);
-        }
+        mySwipeRefreshLayout.setOnRefreshListener(
+                new SwipeRefreshLayout.OnRefreshListener() {
+                    @Override
+                    public void onRefresh() {
+                        complaintList.clear();
+                        new GetComplaints().execute(0);
+                    }
+                }
+        );
 
-        new GetComplaints().execute();
 
         return v;
-    }
-
-    public void loadNextData(final int offset) {
-        // Send an API request to retrieve appropriate paginated data
-        //  --> Send the request including an offset value (i.e `page`) as a query parameter.
-        //  --> Deserialize and construct new model objects from the API response
-        //  --> Append the new data objects to the existing set of items inside the array of items
-        //  --> Notify the adapter of the new items made with `notifyItemRangeInserted()`
-
-        //pendingList.add(null);
-        //mAdapter.notifyItemInserted(pendingList.size() - 1);
-        //pendingList.remove(pendingList.size() - 1);
-        //mAdapter.notifyItemRemoved(pendingList.size());
-        /*for (int i = offset; i < offset + 10 ; i++) {
-            pendingList.add(new Complaint(i, false));
-        }
-        mAdapter.notifyItemRangeInserted(offset, 10);*/
-
-        /*Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-
-            }
-        }, 5000);*/
-
     }
 
     public static class RecyclerTouchListener implements RecyclerView.OnItemTouchListener {
@@ -265,16 +231,6 @@ public class HomeFragment extends Fragment {
         mListener = null;
     }
 
-    /**
-     * This interface must be implemented by activities that contain this
-     * fragment to allow an interaction in this fragment to be communicated
-     * to the activity and potentially other fragments contained in that
-     * activity.
-     * <p>
-     * See the Android Training lesson <a href=
-     * "http://developer.android.com/training/basics/fragments/communicating.html"
-     * >Communicating with Other Fragments</a> for more information.
-     */
     public interface OnFragmentInteractionListener {
         // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
@@ -286,7 +242,7 @@ public class HomeFragment extends Fragment {
         void onLongClick(View view, int position);
     }
 
-    private class GetComplaints extends AsyncTask<Bitmap, Void, String> {
+    private class GetComplaints extends AsyncTask<Integer, Void, String> {
 
         String JSON_STRING;
         JSONObject jsonObject = null;
@@ -294,50 +250,97 @@ public class HomeFragment extends Fragment {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            //loading = ProgressDialog.show(getActivity(), null, "Getting location...", true, true);
-            //loading.setCancelable(false);
         }
 
         @Override
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
-            mAdapter.notifyDataSetChanged();
-            recyclerView.setVisibility(View.VISIBLE);
+            parsejosnData(s);
         }
 
         @Override
-        protected String doInBackground(Bitmap... params) {
+        protected String doInBackground(Integer... params) {
 
             HashMap<String, String> user = session.getUserDetails();
             RequestHandler rh = new RequestHandler();
-            JSON_STRING = rh.sendGetRequest(Config.getComplaints + user.get(SessionManager.KEY_EMAIL));
-            JSON_STRING = "{\"result\":" + JSON_STRING + "}";
-            try {
-                jsonObject = new JSONObject(JSON_STRING);
-                JSONArray result = jsonObject.getJSONArray("result");
 
-                for (int i = 0; i < result.length(); i++) {
-                    JSONObject jo = result.getJSONObject(i);
-                    String id = jo.getString("_id");
-                    boolean starred = jo.getBoolean("starred");
-                    String status = jo.getString("status");
-                    String detail = jo.getString("detail");
-                    String date = jo.getString("date");
-                    String image = jo.getString("imagePath") + id + ".png";
-                    String address = jo.getString("address");
+            if (params[0] == 0) {
+                JSON_STRING = rh.sendGetRequest(Config.getComplaintCount + user.get(SessionManager.KEY_EMAIL));
+                try {
+                    jsonObject = new JSONObject(JSON_STRING);
 
-                    Log.i(".`.`.", image);
-
-                    Complaint c = new Complaint(id, status, detail, date, address, starred, image);
-                    complaintList.add(c);
+                    totalCount = jsonObject.getInt("count");
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
-
-            } catch (JSONException e) {
-                e.printStackTrace();
             }
 
-            return null;
+            JSON_STRING = null;
+            jsonObject = null;
 
+            JSON_STRING = rh.sendGetRequest(Config.getComplaints + user.get(SessionManager.KEY_EMAIL) + "/" + String.valueOf(params[0]));
+            JSON_STRING = "{\"result\":" + JSON_STRING + "}";
+
+            pageNumber = params[0];
+
+            return JSON_STRING;
+
+        }
+    }
+
+
+    public void parsejosnData(String response) {
+
+        JSONObject jsonObject;
+
+        try {
+
+            if (pageNumber > 0) {
+                complaintList.remove(complaintList.size() - 1);
+                mAdapter.notifyItemRemoved(complaintList.size());
+            } else {
+                mAdapter.notifyDataSetChanged();
+            }
+
+            jsonObject = new JSONObject(response);
+            JSONArray result = jsonObject.getJSONArray("result");
+
+            for (int i = 0; i < result.length(); i++) {
+                JSONObject jo = result.getJSONObject(i);
+                String id = jo.getString("_id");
+                boolean starred = jo.getBoolean("starred");
+                String status = jo.getString("status");
+                String detail = jo.getString("detail");
+                String date = jo.getString("date");
+                String image = jo.getString("imagePath") + id + ".png";
+                String address = jo.getString("address");
+
+                Complaint c = new Complaint(id, status, detail, date, address, starred, image);
+                complaintList.add(c);
+
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mAdapter.notifyItemInserted(complaintList.size());
+                    }
+                });
+            }
+
+            mAdapter.setLoaded();
+
+            if (complaintList.isEmpty()) {
+                recyclerView.setVisibility(View.GONE);
+            } else {
+                recyclerView.setVisibility(View.VISIBLE);
+            }
+
+            pBar.setVisibility(View.GONE);
+            if (mySwipeRefreshLayout.isRefreshing()) {
+                mySwipeRefreshLayout.setRefreshing(false);
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 }

@@ -77,6 +77,9 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.firebase.auth.FirebaseAuth;
 import com.nrupeshpatel.cleancity.fragments.HomeFragment;
+import com.nrupeshpatel.cleancity.fragments.PendingFragment;
+import com.nrupeshpatel.cleancity.fragments.SolvedFragment;
+import com.nrupeshpatel.cleancity.fragments.StarredFragment;
 import com.nrupeshpatel.cleancity.helper.ConnectionDetector;
 import com.nrupeshpatel.cleancity.helper.PermissionUtils;
 import com.nrupeshpatel.cleancity.helper.PrefManager;
@@ -95,7 +98,7 @@ import de.hdodenhof.circleimageview.CircleImageView;
 import uk.co.samuelwall.materialtaptargetprompt.MaterialTapTargetPrompt;
 
 public class MainActivity extends AppCompatActivity
-        implements HomeFragment.OnFragmentInteractionListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        implements HomeFragment.OnFragmentInteractionListener, PendingFragment.OnFragmentInteractionListener, SolvedFragment.OnFragmentInteractionListener, StarredFragment.OnFragmentInteractionListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private GoogleApiClient mGoogleApiClient;
     private static final String TAG = MainActivity.class.getSimpleName();
@@ -242,9 +245,9 @@ public class MainActivity extends AppCompatActivity
     private void setupViewPager(ViewPager viewPager) {
         ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
         adapter.addFragment(new HomeFragment(), "Home");
-        adapter.addFragment(new HomeFragment(), "Pending");
-        adapter.addFragment(new HomeFragment(), "Solved");
-        adapter.addFragment(new HomeFragment(), "Starred");
+        adapter.addFragment(new PendingFragment(), "Pending");
+        adapter.addFragment(new SolvedFragment(), "Solved");
+        adapter.addFragment(new StarredFragment(), "Starred");
         viewPager.setAdapter(adapter);
         viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override

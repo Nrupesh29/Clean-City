@@ -27,4 +27,5 @@ package com.nrupeshpatel.cleancity.helper;
 public class Config {
     public static String addComplaint = "http://192.168.1.133:8080/api/complaints";
     public static String getComplaints = "http://192.168.1.133:8080/api/complaints/";
+    public static String getComplaintCount = "http://192.168.1.133:8080/api/complaints/count/";
 }

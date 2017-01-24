@@ -24,8 +24,7 @@
 
 package com.nrupeshpatel.cleancity.adapter;
 
-import android.content.Context;
-import android.graphics.Bitmap;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -35,26 +34,143 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.resource.drawable.GlideDrawable;
-import com.bumptech.glide.request.RequestListener;
-import com.bumptech.glide.request.target.Target;
 import com.nrupeshpatel.cleancity.R;
+import com.nrupeshpatel.cleancity.helper.OnLoadMoreListener;
 
 import java.util.List;
 
-public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.MyViewHolder> {
+public class ComplaintAdapter extends RecyclerView.Adapter {
+    private final int VIEW_ITEM = 1;
+    private final int VIEW_PROG = 0;
 
     private List<Complaint> complaintList;
-    private Context context;
 
-    class MyViewHolder extends RecyclerView.ViewHolder {
-        TextView complaintId, ndc, status;
-        public ImageView star;
+    private int visibleThreshold = 2;
+    private int lastVisibleItem, totalItemCount;
+    private boolean loading;
+    private OnLoadMoreListener onLoadMoreListener;
+
+
+    public ComplaintAdapter(List<Complaint> complaintList1, RecyclerView recyclerView) {
+
+        complaintList = complaintList1;
+
+        if (recyclerView.getLayoutManager() instanceof LinearLayoutManager) {
+
+            final LinearLayoutManager linearLayoutManager = (LinearLayoutManager) recyclerView
+                    .getLayoutManager();
+
+
+            recyclerView
+                    .addOnScrollListener(new RecyclerView.OnScrollListener() {
+                        @Override
+                        public void onScrolled(RecyclerView recyclerView,
+                                               int dx, int dy) {
+                            super.onScrolled(recyclerView, dx, dy);
+
+                            totalItemCount = linearLayoutManager.getItemCount();
+                            lastVisibleItem = linearLayoutManager
+                                    .findLastVisibleItemPosition();
+                            if (!loading
+                                    && totalItemCount <= (lastVisibleItem + visibleThreshold)) {
+                                // End has been reached
+                                // Do something
+                                if (onLoadMoreListener != null) {
+                                    onLoadMoreListener.onLoadMore();
+                                }
+                                loading = true;
+                            }
+                        }
+                    });
+        }
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        return complaintList.get(position) != null ? VIEW_ITEM : VIEW_PROG;
+    }
+
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent,
+                                                      int viewType) {
+        RecyclerView.ViewHolder vh;
+        if (viewType == VIEW_ITEM) {
+            View v = LayoutInflater.from(parent.getContext()).inflate(
+                    R.layout.complaint_row, parent, false);
+
+            vh = new MyViewHolder(v);
+        } else {
+            View v = LayoutInflater.from(parent.getContext()).inflate(
+                    R.layout.complaint_loading_row, parent, false);
+
+            vh = new ProgressViewHolder(v);
+        }
+        return vh;
+    }
+
+    @Override
+    public int getItemCount() {
+        return complaintList.size();
+    }
+
+    @Override
+    public void onBindViewHolder(final RecyclerView.ViewHolder holder, final int position) {
+        if (holder instanceof MyViewHolder) {
+
+            final Complaint complaint = complaintList.get(position);
+
+            final boolean isStared = complaint.getStarred();
+            if (!isStared) {
+                ((MyViewHolder) holder).star.setImageDrawable(((MyViewHolder) holder).star.getContext().getResources().getDrawable(R.drawable.ic_star_row));
+            } else {
+                ((MyViewHolder) holder).star.setImageDrawable(((MyViewHolder) holder).star.getContext().getResources().getDrawable(R.drawable.ic_star_selected_row));
+            }
+            ((MyViewHolder) holder).star.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (!isStared) {
+                        //complaint.setStar(true);
+                        ((MyViewHolder) holder).star.setImageDrawable(((MyViewHolder) holder).star.getContext().getResources().getDrawable(R.drawable.ic_star_selected_row));
+                    } else {
+                        //complaint.setStar(false);
+                        ((MyViewHolder) holder).star.setImageDrawable(((MyViewHolder) holder).star.getContext().getResources().getDrawable(R.drawable.ic_star_row));
+                    }
+                }
+            });
+
+            ((MyViewHolder) holder).complaintId.setText(complaint.getId());
+            ((MyViewHolder) holder).complaintStatus.setText(complaint.getStatus());
+            ((MyViewHolder) holder).complaintTime.setText(complaint.getDate());
+            ((MyViewHolder) holder).complaintLocation.setText(complaint.getAddress());
+
+            Glide.with(((MyViewHolder) holder).complaintImage.getContext())
+                    .load(complaint.getImage())
+                    .placeholder(((MyViewHolder) holder).complaintImage.getContext().getResources().getDrawable(R.drawable.logo))
+                    .centerCrop()
+                    .into(((MyViewHolder) holder).complaintImage);
+
+
+        } else {
+            ((ProgressViewHolder) holder).progressBar.setIndeterminate(true);
+        }
+    }
+
+    public void setLoaded() {
+        loading = false;
+    }
+
+    public void setOnLoadMoreListener(OnLoadMoreListener onLoadMoreListener) {
+        this.onLoadMoreListener = onLoadMoreListener;
+    }
+
+
+    private class MyViewHolder extends RecyclerView.ViewHolder {
+        TextView complaintId;
+        ImageView star;
         private ImageView complaintImage;
         private TextView complaintStatus;
         private TextView complaintTime;
         private TextView complaintLocation;
-        ProgressBar pBar;
 
         MyViewHolder(View view) {
             super(view);
@@ -64,77 +180,16 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.MyVi
             complaintTime = (TextView) view.findViewById(R.id.complaintTime);
             complaintLocation = (TextView) view.findViewById(R.id.complaintLocation);
             complaintImage = (ImageView) view.findViewById(R.id.complaintImage);
-            pBar = (ProgressBar) view.findViewById(R.id.progressBar);
         }
     }
 
 
-    public ComplaintAdapter(Context context, List<Complaint> complaintList) {
-        this.context = context;
-        this.complaintList = complaintList;
-    }
+    private static class ProgressViewHolder extends RecyclerView.ViewHolder {
+        ProgressBar progressBar;
 
-    @Override
-    public int getItemViewType(int position) {
-        return complaintList.get(position) != null ? 1 : 0;
-    }
-
-    @Override
-    public MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-
-        View itemView;
-
-        if (viewType == 1) {
-            itemView = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.complaint_row, parent, false);
-        } else {
-            itemView = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.complaint_loading_row, parent, false);
+        ProgressViewHolder(View v) {
+            super(v);
+            progressBar = (ProgressBar) v.findViewById(R.id.progressBar1);
         }
-
-        return new MyViewHolder(itemView);
-    }
-
-    @Override
-    public void onBindViewHolder(final MyViewHolder holder, int position) {
-
-        if (getItemViewType(position) == 1) {
-            final Complaint complaint = complaintList.get(position);
-
-            final boolean isStared = complaint.getStarred();
-            if (!isStared) {
-                holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_row));
-            } else {
-                holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_selected_row));
-            }
-            holder.star.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if (!isStared) {
-                        //complaint.setStar(true);
-                        holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_selected_row));
-                    } else {
-                        //complaint.setStar(false);
-                        holder.star.setImageDrawable(context.getResources().getDrawable(R.drawable.ic_star_row));
-                    }
-                }
-            });
-
-            holder.complaintId.setText(complaint.getId());
-            holder.complaintStatus.setText(complaint.getStatus());
-            holder.complaintTime.setText(complaint.getDate());
-            holder.complaintLocation.setText(complaint.getAddress());
-
-            Glide.with(context)
-                    .load(complaint.getImage())
-                    .centerCrop()
-                    .into(holder.complaintImage);
-            holder.pBar.setVisibility(View.GONE);
-        }
-    }
-
-    @Override
-    public int getItemCount() {
-        return complaintList.size();
     }
 }

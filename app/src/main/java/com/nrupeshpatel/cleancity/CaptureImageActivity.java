@@ -159,8 +159,14 @@ public class CaptureImageActivity extends AppCompatActivity {
                         if (isInternetPresent) {
                             detail = detailEt.getText().toString();
 
-                            image = getStringImage(scaleBitmapDown(
-                                    ((GlideBitmapDrawable) capturedImage.getDrawable()).getBitmap(), 1500));
+                            if (isGlide) {
+                                image = getStringImage(scaleBitmapDown(
+                                        ((GlideBitmapDrawable) capturedImage.getDrawable()).getBitmap(), 1500));
+                            } else {
+                                image = getStringImage(scaleBitmapDown(
+                                        ((BitmapDrawable) capturedImage.getDrawable()).getBitmap(), 1500));
+                            }
+
                             new GetLocation().execute();
                         } else {
                             Toast.makeText(CaptureImageActivity.this, "No Internet Connectivity!!", Toast.LENGTH_SHORT).show();
